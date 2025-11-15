@@ -1,4 +1,8 @@
 // api/index.js
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
+
 const express = require("express");
 const serverless = require("serverless-http");
 const cors = require("cors");
@@ -12,7 +16,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Quick health routes that should NOT block on DB
+// Quick health + root endpoints that should not block on DB
 app.get("/api/health", (req, res) => res.json({ message: "API is healthy" }));
 app.get("/", (req, res) => res.json({ message: "Server is running!" }));
 
@@ -22,25 +26,23 @@ let dbConnected = false;
 
 app.use(async (req, res, next) => {
   if (req.path === "/favicon.ico") return res.status(204).end();
-
   if (dbConnected) return next();
 
   try {
-    await connectDB(); // will throw a descriptive error if MONGO_URI missing
+    await connectDB();
     dbConnected = true;
     console.log("MongoDB connected (cold start)");
     next();
   } catch (err) {
-    console.error("DB connection failed:", err.message || err);
-    // Respond quickly with JSON error (prevents function crashing)
+    console.error("DB connection failed:", err && (err.message || err));
     return res.status(500).json({
       message: "Database connection failed",
-      error: err.message || String(err)
+      error: err && (err.message || String(err))
     });
   }
 });
 
-// Register routes (they assume DB is connected once middleware passed)
+// Register routes
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 

@@ -3,35 +3,28 @@ const mongoose = require("mongoose");
 const Task = require("../models/Task");
 
 const VALID_STATUSES = ["Pending", "Completed"];
-
-// helper: validate ObjectId
 function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(String(id));
 }
 
-// GET /api/tasks
 exports.getTasks = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized - no user" });
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, parseInt(req.query.limit) || 10); // limit upper bound
+    const limit = Math.min(100, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
 
     const [tasks, total] = await Promise.all([
-      Task.find({ createdBy: userId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Task.find({ createdBy: userId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Task.countDocuments({ createdBy: userId })
     ]);
 
     return res.json({
       tasks,
       currentPage: page,
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
       totalTasks: total,
     });
   } catch (error) {
@@ -40,19 +33,15 @@ exports.getTasks = async (req, res) => {
   }
 };
 
-// POST /api/tasks
 exports.createTask = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const { title, description, status } = req.body;
-    if (!title || !description) {
-      return res.status(400).json({ message: "Title and description required" });
-    }
+    if (!title || !description) return res.status(400).json({ message: "Title and description required" });
 
     const normalizedStatus = status && VALID_STATUSES.includes(status) ? status : "Pending";
-
     const task = new Task({
       title: String(title).trim(),
       description: String(description).trim(),
@@ -61,7 +50,6 @@ exports.createTask = async (req, res) => {
     });
 
     await task.save();
-
     return res.status(201).json(task);
   } catch (error) {
     console.error("Error creating task:", error);
@@ -69,7 +57,6 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// PUT /api/tasks/:id
 exports.updateTask = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -87,7 +74,6 @@ exports.updateTask = async (req, res) => {
     if (status !== undefined && VALID_STATUSES.includes(status)) task.status = status;
 
     await task.save();
-
     return res.json(task);
   } catch (error) {
     console.error("Error updating task:", error);
@@ -95,7 +81,6 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-// DELETE /api/tasks/:id
 exports.deleteTask = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -115,31 +100,23 @@ exports.deleteTask = async (req, res) => {
   }
 };
 
-// GET /api/tasks/admin
 exports.getAllTasksForAdmin = async (req, res) => {
   try {
-    // only admin users allowed
-    const role = req.user?.role;
-    if (role !== "admin") return res.status(403).json({ message: "Access denied. Admin only." });
+    if (req.user?.role !== "admin") return res.status(403).json({ message: "Access denied. Admin only." });
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
 
     const [tasks, total] = await Promise.all([
-      Task.find()
-        .populate("createdBy", "name email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Task.find().populate("createdBy", "name email").sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Task.countDocuments()
     ]);
 
     return res.json({
       tasks,
       currentPage: page,
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
       totalTasks: total,
     });
   } catch (error) {

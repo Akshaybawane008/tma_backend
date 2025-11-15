@@ -1,21 +1,18 @@
+// routes/taskRoutes.js
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 const {
-  getTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-  getAllTasksForAdmin,
+  getTasks, createTask, updateTask, deleteTask, getAllTasksForAdmin
 } = require("../controllers/taskController");
 
-// ✅ Base route: /api/tasks
 router.get("/", authMiddleware, getTasks);
 router.post("/", authMiddleware, createTask);
 router.put("/:id", authMiddleware, updateTask);
 router.delete("/:id", authMiddleware, deleteTask);
 
-// (Optional) For admins
-router.get("/admin", authMiddleware, getAllTasksForAdmin);
+// admin route (protected)
+router.get("/admin", authMiddleware, adminMiddleware, getAllTasksForAdmin);
 
 module.exports = router;

@@ -7,13 +7,11 @@ const authMiddleware = async (req, res, next) => {
     const raw = req.header("Authorization");
     const token = raw ? raw.replace("Bearer ", "") : null;
 
-    if (!token) {
-      return res.status(401).json({ message: "No token, authorization denied" });
-    }
+    if (!token) return res.status(401).json({ message: "No token, authorization denied" });
 
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-      console.error("JWT_SECRET is not defined in environment");
+      console.error("JWT_SECRET is not defined");
       return res.status(500).json({ message: "Server configuration error" });
     }
 
@@ -25,11 +23,8 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ message: "Token is not valid" });
     }
 
-    // Attach user (without password) to req. If user not found -> unauthorized.
     const user = await User.findById(decoded.userId).select("-password").lean();
-    if (!user) {
-      return res.status(401).json({ message: "User not found or token invalid" });
-    }
+    if (!user) return res.status(401).json({ message: "User not found or token invalid" });
 
     req.user = user;
     next();
