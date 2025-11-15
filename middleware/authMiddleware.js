@@ -1,18 +1,41 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+// middleware/authMiddleware.js
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const raw = req.header("Authorization");
+    const token = raw ? raw.replace("Bearer ", "") : null;
+
     if (!token) {
-      return res.status(401).json({ message: 'No token, authorization denied' });
+      return res.status(401).json({ message: "No token, authorization denied" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    req.user = await User.findById(decoded.userId).select('-password');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET is not defined in environment");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, secret);
+    } catch (err) {
+      console.warn("JWT verification failed:", err.message);
+      return res.status(401).json({ message: "Token is not valid" });
+    }
+
+    // Attach user (without password) to req. If user not found -> unauthorized.
+    const user = await User.findById(decoded.userId).select("-password").lean();
+    if (!user) {
+      return res.status(401).json({ message: "User not found or token invalid" });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token is not valid' });
+    console.error("authMiddleware error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
