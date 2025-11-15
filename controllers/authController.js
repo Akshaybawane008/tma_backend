@@ -1,14 +1,17 @@
+// controllers/authController.js
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const connectDB = require("../config/db");
 
 // POST /api/auth/signup
 exports.signup = async (req, res) => {
   try {
-    await connectDB();
-
     const { name, email, password, role } = req.body;
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: "Name, email and password are required" });
+    }
+
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: "User already exists" });
 
@@ -27,17 +30,17 @@ exports.signup = async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
-    console.error("Signup error:", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Signup error:", error.message || error);
+    res.status(500).json({ message: "Server error", error: error.message || String(error) });
   }
 };
 
 // POST /api/auth/signin
 exports.signin = async (req, res) => {
   try {
-    await connectDB();
-
     const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
@@ -55,7 +58,7 @@ exports.signin = async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
-    console.error("Signin error:", error.message);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Signin error:", error.message || error);
+    res.status(500).json({ message: "Server error", error: error.message || String(error) });
   }
 };

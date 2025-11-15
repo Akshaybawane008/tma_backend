@@ -3,10 +3,10 @@ const mongoose = require("mongoose");
 
 const MONGO_URI = process.env.MONGO_URI;
 if (!MONGO_URI) {
-  throw new Error("Please define the MONGO_URI environment variable inside vercel or .env");
+  throw new Error("Please define the MONGO_URI environment variable");
 }
 
-// Global cache for serverless environments
+// Global cached connection across lambda invocations (serverless)
 let cached = global._mongooseCache || { conn: null, promise: null };
 
 async function connectDB() {
@@ -16,21 +16,22 @@ async function connectDB() {
 
   if (!cached.promise) {
     const opts = {
-      // Keep the socket timeouts short for serverless so failures are fast
+      // fail fast on server selection if DB unreachable
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // <-- fail fast (5s) if server selection fails
+      serverSelectionTimeoutMS: 5000, // 5s -> fail fast
       socketTimeoutMS: 45000,
-      // other options as needed
     };
 
-    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongooseInstance) => {
-      return mongooseInstance;
-    }).catch((err) => {
-      // reset promise so next invocation can retry
-      cached.promise = null;
-      throw err;
-    });
+    cached.promise = mongoose.connect(MONGO_URI, opts)
+      .then((mongooseInstance) => {
+        return mongooseInstance;
+      })
+      .catch((err) => {
+        // reset so next invocation can retry
+        cached.promise = null;
+        throw err;
+      });
   }
 
   cached.conn = await cached.promise;
